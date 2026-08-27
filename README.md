@@ -14,8 +14,9 @@ is already a disposable environment.
 
 1. Admin login via `wp-login.php` succeeds.
 2. `plugins.php` loads with no activation error and no fatal.
-3. Every admin menu page the active plugin contributes (plus core pages) renders
-   without a PHP fatal / critical error and without an HTTP 5xx.
+3. Every admin page the plugin registers (menu links carrying a `page=` param),
+   plus the dashboard, renders without a PHP fatal / critical error and without
+   an HTTP 5xx.
 
 ## Use it in a plugin repo
 
