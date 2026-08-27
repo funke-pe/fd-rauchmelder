@@ -1,0 +1,16 @@
+{
+  "name": "wp-plugin-smoketest-harness",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Runtime smoketest harness: boots WordPress via Playground and drives wp-admin with Playwright.",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@wp-playground/cli": "^3.1.51"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
+  }
+}

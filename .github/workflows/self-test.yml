@@ -1,0 +1,53 @@
+name: Harness Self-Test
+
+# Guards the smoketest harness itself: proves it PASSES on a clean plugin and
+# FAILS on a plugin that triggers a fatal. If either expectation breaks, the
+# harness can no longer be trusted and this job goes red.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  self-test:
+    name: Fixtures (clean must pass, broken must fail)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: harness
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Clean fixture must PASS
+        run: |
+          nohup npx @wp-playground/cli server \
+            --auto-mount=./fixtures/clean-plugin \
+            --port=9400 --login --define-bool WP_DEBUG true \
+            --verbosity=normal > /tmp/pg-clean.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf -o /dev/null http://127.0.0.1:9400/wp-login.php && break; sleep 2; done
+          SMOKE_BASE_URL=http://127.0.0.1:9400 SMOKE_PLUGIN_NAME="Clean Smoketest Fixture" npx playwright test
+          kill "$(lsof -ti:9400)"
+
+      - name: Broken fixture must FAIL
+        run: |
+          nohup npx @wp-playground/cli server \
+            --auto-mount=./fixtures/broken-plugin \
+            --port=9400 --login --define-bool WP_DEBUG true \
+            --verbosity=normal > /tmp/pg-broken.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf -o /dev/null http://127.0.0.1:9400/wp-login.php && break; sleep 2; done
+          if SMOKE_BASE_URL=http://127.0.0.1:9400 npx playwright test; then
+            echo "::error::Harness did NOT catch the broken plugin's fatal — it is unreliable."
+            kill "$(lsof -ti:9400)"
+            exit 1
+          fi
+          echo "Broken fixture failed as expected."
+          kill "$(lsof -ti:9400)"

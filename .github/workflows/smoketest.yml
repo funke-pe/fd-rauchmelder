@@ -1,0 +1,107 @@
+name: Plugin Smoketest
+
+# Reusable runtime smoketest: boots real WordPress via WordPress Playground with
+# the calling plugin mounted + activated, then drives wp-admin with Playwright and
+# fails if any admin page throws a PHP fatal / "critical error".
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        description: PHP version for the WordPress runtime.
+        type: string
+        default: '8.3'
+      wp-version:
+        description: WordPress version (e.g. "latest", "6.6").
+        type: string
+        default: 'latest'
+      plugin-name:
+        description: Plugin display name to assert as active on plugins.php (optional).
+        type: string
+        default: ''
+      harness-ref:
+        description: Git ref of funke-pe/wp-plugin-smoketest to use.
+        type: string
+        default: 'main'
+
+jobs:
+  smoketest:
+    name: WordPress Playground smoketest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout plugin (caller repo)
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Checkout smoketest harness
+        uses: actions/checkout@v4
+        with:
+          repository: funke-pe/wp-plugin-smoketest
+          ref: ${{ inputs.harness-ref }}
+          path: smoketest
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install harness dependencies
+        working-directory: smoketest/harness
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Include optional per-plugin spec
+        run: |
+          if compgen -G "plugin/.smoketest/*.spec.ts" > /dev/null; then
+            echo "Found per-plugin spec(s), adding to the suite."
+            cp plugin/.smoketest/*.spec.ts smoketest/harness/tests/
+          fi
+
+      - name: Boot WordPress Playground
+        working-directory: smoketest/harness
+        run: |
+          BLUEPRINT_ARG=""
+          if [ -f "$GITHUB_WORKSPACE/plugin/.smoketest/blueprint.json" ]; then
+            echo "Using per-plugin blueprint."
+            BLUEPRINT_ARG="--blueprint=$GITHUB_WORKSPACE/plugin/.smoketest/blueprint.json --blueprint-may-read-adjacent-files"
+          fi
+          nohup npx @wp-playground/cli server \
+            --auto-mount="$GITHUB_WORKSPACE/plugin" \
+            --port=9400 \
+            --php="${{ inputs.php-version }}" \
+            --wp="${{ inputs.wp-version }}" \
+            --login \
+            --define-bool WP_DEBUG true \
+            $BLUEPRINT_ARG \
+            --verbosity=normal > "$GITHUB_WORKSPACE/playground.log" 2>&1 &
+          echo "Waiting for WordPress to boot..."
+          for i in $(seq 1 90); do
+            if curl -sf -o /dev/null http://127.0.0.1:9400/wp-login.php; then
+              echo "WordPress is up after ~$((i*2))s."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::WordPress Playground did not boot in time."
+          cat "$GITHUB_WORKSPACE/playground.log" || true
+          exit 1
+
+      - name: Run smoketest
+        working-directory: smoketest/harness
+        env:
+          SMOKE_BASE_URL: http://127.0.0.1:9400
+          SMOKE_PLUGIN_NAME: ${{ inputs.plugin-name }}
+        run: npx playwright test
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoketest-report
+          path: |
+            smoketest/harness/playwright-report/
+            smoketest/harness/test-results/
+            playground.log
+          retention-days: 7
+          if-no-files-found: ignore
