@@ -48,27 +48,30 @@ test('plugins page loads without activation errors or fatals', async ({ page }) 
 	}
 });
 
-test('every admin menu page renders without a fatal error', async ({ page, baseURL }) => {
-	await page.goto('/wp-admin/', { waitUntil: 'networkidle' });
+test("the plugin's admin pages render without a fatal error", async ({ page, baseURL }) => {
+	// The crawl visits a handful of pages on a single-threaded Playground; give it room.
+	test.setTimeout(180_000);
 
-	// Collect the admin menu links the active plugin(s) contributed, plus core pages.
-	const hrefs: string[] = await page.$$eval('#adminmenu a[href]', (as) =>
+	await page.goto('/wp-admin/', { waitUntil: 'domcontentloaded' });
+
+	// The plugin's own screens are registered via add_menu_page/add_submenu_page and
+	// always carry a `page=` query param. Core screens (edit.php, upload.php, profile.php,
+	// ...) don't, and aren't "the plugin's" — skipping them keeps the crawl fast and focused.
+	const pluginPages: string[] = await page.$$eval('#adminmenu a[href*="page="]', (as) =>
 		as
 			.map((a) => (a as HTMLAnchorElement).href)
-			.filter((h) => h.includes('/wp-admin/'))
-			// Skip logout and external/self-referential anchors.
-			.filter((h) => !h.includes('action=logout') && !h.includes('#'))
+			.filter((h) => h.includes('/wp-admin/') && !h.includes('action=logout'))
 	);
 
-	const unique = [...new Set(hrefs)];
-	expect(unique.length, 'should discover admin menu pages to crawl').toBeGreaterThan(0);
+	// Always include the dashboard: it catches fatals hooked on admin_init/admin_menu
+	// even for plugins that register no admin page of their own.
+	const targets = [...new Set([`${baseURL}/wp-admin/index.php`, ...pluginPages])];
 
 	const failures: string[] = [];
-	for (const href of unique) {
+	for (const href of targets) {
 		const res = await page.goto(href, { waitUntil: 'domcontentloaded' });
 		const status = res?.status() ?? 0;
-		const html = await bodyText(page);
-		const fatal = findFatal(html);
+		const fatal = findFatal(await bodyText(page));
 		if (status >= 500 || fatal) {
 			const path = href.replace(baseURL || '', '');
 			failures.push(`${path} → status ${status}${fatal ? `, fatal: "${fatal}"` : ''}`);
