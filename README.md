@@ -28,6 +28,9 @@ on: pull_request
 jobs:
   smoketest:
     uses: funke-pe/wp-plugin-smoketest/.github/workflows/smoketest.yml@main
+    permissions:
+      contents: read
+      pull-requests: write  # lets the smoketest post failure details as a PR comment
     # Optional:
     # with:
     #   php-version: '8.3'
