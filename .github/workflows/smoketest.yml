@@ -60,32 +60,15 @@ jobs:
 
       - name: Boot WordPress Playground
         working-directory: smoketest/harness
+        env:
+          PLAYGROUND_PHP: ${{ inputs.php-version }}
+          PLAYGROUND_WP: ${{ inputs.wp-version }}
         run: |
-          BLUEPRINT_ARG=""
           if [ -f "$GITHUB_WORKSPACE/plugin/.smoketest/blueprint.json" ]; then
             echo "Using per-plugin blueprint."
-            BLUEPRINT_ARG="--blueprint=$GITHUB_WORKSPACE/plugin/.smoketest/blueprint.json --blueprint-may-read-adjacent-files"
+            export PLAYGROUND_BLUEPRINT="$GITHUB_WORKSPACE/plugin/.smoketest/blueprint.json"
           fi
-          nohup npx @wp-playground/cli server \
-            --auto-mount="$GITHUB_WORKSPACE/plugin" \
-            --port=9400 \
-            --php="${{ inputs.php-version }}" \
-            --wp="${{ inputs.wp-version }}" \
-            --login \
-            --define-bool WP_DEBUG true \
-            $BLUEPRINT_ARG \
-            --verbosity=normal > "$GITHUB_WORKSPACE/playground.log" 2>&1 &
-          echo "Waiting for WordPress to boot..."
-          for i in $(seq 1 90); do
-            if curl -sf -o /dev/null http://127.0.0.1:9400/wp-login.php; then
-              echo "WordPress is up after ~$((i*2))s."
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::WordPress Playground did not boot in time."
-          cat "$GITHUB_WORKSPACE/playground.log" || true
-          exit 1
+          bash boot.sh "$GITHUB_WORKSPACE/plugin" "$GITHUB_WORKSPACE/playground.log"
 
       - name: Run smoketest
         working-directory: smoketest/harness

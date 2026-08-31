@@ -29,21 +29,13 @@ jobs:
 
       - name: Clean fixture must PASS
         run: |
-          nohup npx @wp-playground/cli server \
-            --auto-mount=./fixtures/clean-plugin \
-            --port=9400 --login --define-bool WP_DEBUG true \
-            --verbosity=normal > /tmp/pg-clean.log 2>&1 &
-          for i in $(seq 1 90); do curl -sf -o /dev/null http://127.0.0.1:9400/wp-login.php && break; sleep 2; done
+          bash boot.sh ./fixtures/clean-plugin /tmp/pg-clean.log
           SMOKE_BASE_URL=http://127.0.0.1:9400 SMOKE_PLUGIN_NAME="Clean Smoketest Fixture" npx playwright test
           kill "$(lsof -ti:9400)"
 
-      - name: Broken fixture must FAIL
+      - name: Broken fixture (runtime fatal) must FAIL
         run: |
-          nohup npx @wp-playground/cli server \
-            --auto-mount=./fixtures/broken-plugin \
-            --port=9400 --login --define-bool WP_DEBUG true \
-            --verbosity=normal > /tmp/pg-broken.log 2>&1 &
-          for i in $(seq 1 90); do curl -sf -o /dev/null http://127.0.0.1:9400/wp-login.php && break; sleep 2; done
+          bash boot.sh ./fixtures/broken-plugin /tmp/pg-broken.log
           if SMOKE_BASE_URL=http://127.0.0.1:9400 npx playwright test; then
             echo "::error::Harness did NOT catch the broken plugin's fatal — it is unreliable."
             kill "$(lsof -ti:9400)"
@@ -51,3 +43,22 @@ jobs:
           fi
           echo "Broken fixture failed as expected."
           kill "$(lsof -ti:9400)"
+
+      - name: Broken activation (parse error) must FAIL at boot, fast
+        run: |
+          # A plugin with a PHP parse error kills --auto-mount activation, so the
+          # server never boots. boot.sh must detect the dead process and exit 1
+          # QUICKLY. Assert both: it fails, and it fails well under the full
+          # ~180s wait — so a regression back to the wait-only loop goes red here.
+          start=$(date +%s)
+          if bash boot.sh ./fixtures/broken-activation-plugin /tmp/pg-activation.log; then
+            echo "::error::Harness did NOT catch the parse-error plugin — boot wrongly succeeded."
+            kill "$(lsof -ti:9400)" 2>/dev/null || true
+            exit 1
+          fi
+          elapsed=$(( $(date +%s) - start ))
+          echo "Parse-error plugin failed to boot as expected in ${elapsed}s."
+          if [ "$elapsed" -ge 60 ]; then
+            echo "::error::Boot took ${elapsed}s to fail — dead-process detection regressed (should be a few seconds)."
+            exit 1
+          fi

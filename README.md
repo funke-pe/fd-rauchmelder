@@ -58,9 +58,11 @@ harness/
   tests/
     auth.setup.ts   # logs in, stores the admin session
     smoke.spec.ts   # plugins.php + admin-menu crawl
+  boot.sh         # boots Playground, fails fast if the plugin can't activate
   fixtures/
-    clean-plugin/   # proves a healthy plugin passes
-    broken-plugin/  # proves a fatal is caught (harness self-check)
+    clean-plugin/               # proves a healthy plugin passes
+    broken-plugin/              # runtime fatal on an admin page (harness self-check)
+    broken-activation-plugin/   # parse error → fails fast at boot (harness self-check)
 ```
 
 ## Run locally
