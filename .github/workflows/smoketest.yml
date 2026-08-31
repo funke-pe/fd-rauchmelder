@@ -23,6 +23,10 @@ on:
         type: string
         default: 'main'
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   smoketest:
     name: WordPress Playground smoketest
@@ -75,7 +79,38 @@ jobs:
         env:
           SMOKE_BASE_URL: http://127.0.0.1:9400
           SMOKE_PLUGIN_NAME: ${{ inputs.plugin-name }}
-        run: npx playwright test
+        run: |
+          set -o pipefail
+          npx playwright test 2>&1 | tee "$GITHUB_WORKSPACE/playwright-output.txt"
+
+      - name: Report failure on PR
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "### ❌ Plugin Smoketest failed"
+            echo
+            if [ -s "$GITHUB_WORKSPACE/playwright-output.txt" ]; then
+              echo "**Admin smoketest found a problem:**"
+              echo '```'
+              grep -vE "^\s*$" "$GITHUB_WORKSPACE/playwright-output.txt" | tail -n 25
+              echo '```'
+            else
+              echo "**WordPress could not boot with this plugin — likely a PHP parse error or activation fatal:**"
+              echo '```'
+              grep -vE "^\s*$" "$GITHUB_WORKSPACE/playground.log" | tail -n 15
+              echo '```'
+            fi
+            echo
+            echo "_Full report: see the smoketest-report artifact on the [failed run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})._"
+          } > "$GITHUB_WORKSPACE/smoketest-comment.md"
+          cat "$GITHUB_WORKSPACE/smoketest-comment.md" >> "$GITHUB_STEP_SUMMARY"
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --body-file "$GITHUB_WORKSPACE/smoketest-comment.md" \
+            --edit-last --create-if-none \
+            || echo "::warning::Could not post PR comment (needs 'pull-requests: write' permission in the caller workflow)."
 
       - name: Upload report on failure
         if: failure()
