@@ -22,6 +22,12 @@ on:
         description: Git ref of funke-pe/wp-plugin-smoketest to use.
         type: string
         default: 'main'
+    secrets:
+      extra-plugin-urls:
+        description: >
+          Whitespace-separated plugin ZIP URLs to install + activate alongside the
+          plugin under test (e.g. an ACF Pro download URL incl. license key).
+        required: false
 
 # To get failure details posted as a PR comment, the caller must grant:
 #   permissions:
@@ -68,6 +74,7 @@ jobs:
         env:
           PLAYGROUND_PHP: ${{ inputs.php-version }}
           PLAYGROUND_WP: ${{ inputs.wp-version }}
+          PLAYGROUND_EXTRA_PLUGINS: ${{ secrets.extra-plugin-urls }}
         run: |
           if [ -f "$GITHUB_WORKSPACE/plugin/.smoketest/blueprint.json" ]; then
             echo "Using per-plugin blueprint."

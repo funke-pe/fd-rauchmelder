@@ -50,6 +50,28 @@ Drop either file into the plugin repo under `.smoketest/`:
 - `.smoketest/*.spec.ts` — extra Playwright tests, added to the suite. They share
   the logged-in admin session and can hit `SMOKE_BASE_URL`.
 
+## Commercial dependency plugins (e.g. ACF Pro)
+
+Free wordpress.org dependencies go in `.smoketest/blueprint.json`. Commercial
+ones need a licensed download URL that must stay secret — pass it via the
+`extra-plugin-urls` secret and the harness downloads, mounts and activates the
+plugin before yours:
+
+```yaml
+jobs:
+  smoketest:
+    uses: funke-pe/wp-plugin-smoketest/.github/workflows/smoketest.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+    secrets:
+      extra-plugin-urls: ${{ secrets.ACF_PRO_ZIP_URL }}
+```
+
+For ACF Pro, set the repo secret `ACF_PRO_ZIP_URL` to
+`https://connect.advancedcustomfields.com/index.php?a=download&p=pro&k=YOUR-LICENSE-KEY&t=latest`.
+Multiple dependencies: whitespace-separate the URLs inside the secret.
+
 ## Layout
 
 ```
