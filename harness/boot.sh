@@ -59,6 +59,14 @@ for i in $(seq 1 90); do
     exit 1
   fi
   if curl -sf -o /dev/null "http://127.0.0.1:$PORT/wp-login.php"; then
+    # The port can come up briefly before an activation fatal kills the
+    # process — re-check the PID after a grace period before declaring victory.
+    sleep 3
+    if ! kill -0 "$PGPID" 2>/dev/null; then
+      echo "::error::WordPress Playground exited right after boot — the plugin likely has a PHP parse error or an activation fatal."
+      cat "$LOG" || true
+      exit 1
+    fi
     echo "WordPress is up after ~$((i * 2))s."
     exit 0
   fi

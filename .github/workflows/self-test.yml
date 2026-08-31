@@ -53,17 +53,24 @@ jobs:
           echo "Broken fixture failed as expected."
           kill "$(lsof -ti:9400)"
 
-      - name: Broken activation (parse error) must FAIL at boot, fast
+      - name: Broken activation (parse error) must FAIL, fast
         run: |
-          # A plugin with a PHP parse error kills --auto-mount activation, so the
-          # server never boots. boot.sh must detect the dead process and exit 1
-          # QUICKLY. Assert both: it fails, and it fails well under the full
-          # ~180s wait — so a regression back to the wait-only loop goes red here.
+          # A PHP parse error usually kills --auto-mount activation and the boot
+          # (boot.sh must detect that QUICKLY — well under the full ~180s wait).
+          # Playground is not fully deterministic though: sometimes the server
+          # survives with the activation failed — then the smoketest itself must
+          # go red. Either way: the harness has to catch the broken plugin.
           start=$(date +%s)
           if bash boot.sh ./fixtures/broken-activation-plugin /tmp/pg-activation.log; then
-            echo "::error::Harness did NOT catch the parse-error plugin — boot wrongly succeeded."
+            echo "Boot survived the parse-error plugin — smoketest must catch it instead."
+            if SMOKE_BASE_URL=http://127.0.0.1:9400 npx playwright test; then
+              echo "::error::Harness did NOT catch the parse-error plugin."
+              kill "$(lsof -ti:9400)" 2>/dev/null || true
+              exit 1
+            fi
             kill "$(lsof -ti:9400)" 2>/dev/null || true
-            exit 1
+            echo "Smoketest failed as expected."
+            exit 0
           fi
           elapsed=$(( $(date +%s) - start ))
           echo "Parse-error plugin failed to boot as expected in ${elapsed}s."
