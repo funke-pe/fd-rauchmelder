@@ -13,10 +13,10 @@ PORT="${PLAYGROUND_PORT:-9400}"
 PHP="${PLAYGROUND_PHP:-8.3}"
 WP="${PLAYGROUND_WP:-latest}"
 BLUEPRINT="${PLAYGROUND_BLUEPRINT:-}"
-# Whitespace-separated plugin ZIP URLs (e.g. ACF Pro incl. license key — pass as
-# a secret). Downloaded here with curl and mounted locally so the URL never
-# appears in the Playground log or the failure artifact.
-EXTRA="${PLAYGROUND_EXTRA_PLUGINS:-}"
+# Whitespace-separated local plugin directories to mount + activate alongside
+# the plugin under test (e.g. premium dependencies checked out from a cluster
+# repo). Each dir name becomes the plugin slug.
+EXTRA_DIRS="${PLAYGROUND_EXTRA_PLUGIN_DIRS:-}"
 
 args=( server
   --auto-mount="$PLUGIN_DIR"
@@ -26,28 +26,24 @@ args=( server
   --login
   --define-bool WP_DEBUG true
   --verbosity=normal )
-if [ -n "$EXTRA" ]; then
-  EXTRA_DIR=$(mktemp -d)
+if [ -n "$EXTRA_DIRS" ]; then
   steps='[]'
-  for url in $EXTRA; do
-    zip="$EXTRA_DIR/plugin.zip"
-    curl -sfL "$url" -o "$zip" || { echo "::error::Could not download extra plugin ZIP."; exit 1; }
-    unzip -q -o "$zip" -d "$EXTRA_DIR/unzipped" && rm "$zip"
-    inner=$(find "$EXTRA_DIR/unzipped" -mindepth 1 -maxdepth 1 -type d | head -1)
-    slug=$(basename "$inner")
-    dest="$EXTRA_DIR/$slug" && mv "$inner" "$dest" && rm -rf "$EXTRA_DIR/unzipped"
-    main=$(grep -lE "Plugin Name[[:space:]]*:" "$dest"/*.php | head -1)
-    [ -n "$main" ] || { echo "::error::No plugin header found in extra plugin ZIP ($slug)."; exit 1; }
-    args+=( --mount="$dest:/wordpress/wp-content/plugins/$slug" )
+  for dir in $EXTRA_DIRS; do
+    slug=$(basename "$dir")
+    [ -d "$dir" ] || { echo "::error::Extra plugin dir not found: $dir"; exit 1; }
+    main=$(grep -lE "Plugin Name[[:space:]]*:" "$dir"/*.php | head -1)
+    [ -n "$main" ] || { echo "::error::No plugin header found in $dir."; exit 1; }
+    args+=( --mount="$dir:/wordpress/wp-content/plugins/$slug" )
     steps=$(jq --arg p "$slug/$(basename "$main")" '. + [{step:"activatePlugin", pluginPath:$p}]' <<<"$steps")
     echo "Extra plugin ready: $slug"
   done
+  MERGED=$(mktemp -d)/blueprint.json
   if [ -n "$BLUEPRINT" ]; then
-    jq --argjson s "$steps" '.steps = ($s + (.steps // []))' "$BLUEPRINT" > "$EXTRA_DIR/blueprint.json"
+    jq --argjson s "$steps" '.steps = ($s + (.steps // []))' "$BLUEPRINT" > "$MERGED"
   else
-    jq -n --argjson s "$steps" '{steps: $s}' > "$EXTRA_DIR/blueprint.json"
+    jq -n --argjson s "$steps" '{steps: $s}' > "$MERGED"
   fi
-  BLUEPRINT="$EXTRA_DIR/blueprint.json"
+  BLUEPRINT="$MERGED"
 fi
 if [ -n "$BLUEPRINT" ]; then
   args+=( --blueprint="$BLUEPRINT" --blueprint-may-read-adjacent-files )

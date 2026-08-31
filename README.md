@@ -50,12 +50,13 @@ Drop either file into the plugin repo under `.smoketest/`:
 - `.smoketest/*.spec.ts` — extra Playwright tests, added to the suite. They share
   the logged-in admin session and can hit `SMOKE_BASE_URL`.
 
-## Commercial dependency plugins (e.g. ACF Pro)
+## Dependency plugins (free or premium, e.g. ACF Pro, Yoast SEO Premium)
 
-Free wordpress.org dependencies go in `.smoketest/blueprint.json`. Commercial
-ones need a licensed download URL that must stay secret — pass it via the
-`extra-plugin-urls` secret and the harness downloads, mounts and activates the
-plugin before yours:
+The dependencies already live in the cluster repo (`wpcomvip/funke-fdpub`,
+`plugins/` directory) in exactly the versions running in production — the
+smoketest checks them out from there (sparse, only the named slugs) and
+activates them before the plugin under test. No license keys or download URLs
+needed anywhere:
 
 ```yaml
 jobs:
@@ -64,13 +65,16 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    with:
+      cluster-plugins: 'advanced-custom-fields-pro wordpress-seo-premium'
     secrets:
-      extra-plugin-urls: ${{ secrets.ACF_PRO_ZIP_URL }}
+      cluster-repo-token: ${{ secrets.CLUSTER_REPO_TOKEN }}
 ```
 
-For ACF Pro, set the repo secret `ACF_PRO_ZIP_URL` to
-`https://connect.advancedcustomfields.com/index.php?a=download&p=pro&k=YOUR-LICENSE-KEY&t=latest`.
-Multiple dependencies: whitespace-separate the URLs inside the secret.
+One-time org setup: create the `CLUSTER_REPO_TOKEN` organization secret on
+funke-pe — a fine-grained PAT (or GitHub App token) with `contents: read` on
+the cluster repo. The default `GITHUB_TOKEN` cannot cross from funke-pe to
+wpcomvip. A different cluster repo can be set via the `cluster-repo` input.
 
 ## Layout
 

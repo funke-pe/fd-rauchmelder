@@ -22,11 +22,20 @@ on:
         description: Git ref of funke-pe/wp-plugin-smoketest to use.
         type: string
         default: 'main'
-    secrets:
-      extra-plugin-urls:
+      cluster-plugins:
         description: >
-          Whitespace-separated plugin ZIP URLs to install + activate alongside the
-          plugin under test (e.g. an ACF Pro download URL incl. license key).
+          Whitespace-separated plugin slugs to install + activate from the cluster
+          repo's plugins/ directory (e.g. "advanced-custom-fields-pro wordpress-seo-premium").
+          Requires the cluster-repo-token secret.
+        type: string
+        default: ''
+      cluster-repo:
+        description: Repo holding the dependency plugins under plugins/.
+        type: string
+        default: 'wpcomvip/funke-fdpub'
+    secrets:
+      cluster-repo-token:
+        description: Token with contents:read on the cluster repo.
         required: false
 
 # To get failure details posted as a PR comment, the caller must grant:
@@ -69,12 +78,29 @@ jobs:
             cp plugin/.smoketest/*.spec.ts smoketest/harness/tests/
           fi
 
+      - name: Fetch cluster dependency plugins
+        if: inputs.cluster-plugins != ''
+        env:
+          TOKEN: ${{ secrets.cluster-repo-token }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::cluster-plugins is set but the cluster-repo-token secret is missing."
+            exit 1
+          fi
+          git clone --depth 1 --filter=blob:none --sparse \
+            "https://x-access-token:${TOKEN}@github.com/${{ inputs.cluster-repo }}.git" cluster
+          dirs=""
+          for slug in ${{ inputs.cluster-plugins }}; do
+            git -C cluster sparse-checkout add "plugins/$slug"
+            dirs="$dirs $GITHUB_WORKSPACE/cluster/plugins/$slug"
+          done
+          echo "PLAYGROUND_EXTRA_PLUGIN_DIRS=$dirs" >> "$GITHUB_ENV"
+
       - name: Boot WordPress Playground
         working-directory: smoketest/harness
         env:
           PLAYGROUND_PHP: ${{ inputs.php-version }}
           PLAYGROUND_WP: ${{ inputs.wp-version }}
-          PLAYGROUND_EXTRA_PLUGINS: ${{ secrets.extra-plugin-urls }}
         run: |
           if [ -f "$GITHUB_WORKSPACE/plugin/.smoketest/blueprint.json" ]; then
             echo "Using per-plugin blueprint."

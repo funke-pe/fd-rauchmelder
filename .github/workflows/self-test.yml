@@ -33,13 +33,13 @@ jobs:
           SMOKE_BASE_URL=http://127.0.0.1:9400 SMOKE_PLUGIN_NAME="Clean Smoketest Fixture" npx playwright test
           kill "$(lsof -ti:9400)"
 
-      - name: Clean fixture + extra plugin ZIP must PASS (and be active)
+      - name: Clean fixture + dependency plugin dir must PASS (and be active)
         run: |
-          # Verifies PLAYGROUND_EXTRA_PLUGINS: download ZIP → mount → activate.
-          # Same mechanism callers use for commercial deps like ACF Pro.
-          PLAYGROUND_EXTRA_PLUGINS="https://downloads.wordpress.org/plugin/hello-dolly.zip" \
+          # Verifies PLAYGROUND_EXTRA_PLUGIN_DIRS: mount local dir → activate.
+          # Same mechanism the workflow uses for cluster-repo deps like ACF Pro.
+          PLAYGROUND_EXTRA_PLUGIN_DIRS="./fixtures/dependency-plugin" \
             bash boot.sh ./fixtures/clean-plugin /tmp/pg-extra.log
-          SMOKE_BASE_URL=http://127.0.0.1:9400 SMOKE_PLUGIN_NAME="Hello Dolly" npx playwright test
+          SMOKE_BASE_URL=http://127.0.0.1:9400 SMOKE_PLUGIN_NAME="Dependency Fixture" npx playwright test
           kill "$(lsof -ti:9400)"
 
       - name: Broken fixture (runtime fatal) must FAIL
