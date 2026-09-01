@@ -76,6 +76,19 @@ funke-pe — a fine-grained PAT (or GitHub App token) with `contents: read` on
 the cluster repo. The default `GITHUB_TOKEN` cannot cross from funke-pe to
 wpcomvip. A different cluster repo can be set via the `cluster-repo` input.
 
+## Caching (run duration)
+
+The workflow caches npm packages and the Playwright Chromium browser
+(keyed on `package-lock.json`), cutting the install step from ~37s to ~5s
+— a typical run takes ~1:10 instead of ~1:50. Notes:
+
+- The cache lives **per caller repo**: the first run in a plugin repo fills
+  it, subsequent runs are fast.
+- GitHub evicts cache entries unused for **7 days** (every run resets the
+  clock), so actively developed repos stay warm. After a longer pause or a
+  Playwright version bump, one run is slow again while the cache refills.
+- Nothing to configure — it works out of the box.
+
 ## Layout
 
 ```
