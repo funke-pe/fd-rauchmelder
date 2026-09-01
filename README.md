@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" width="120" alt="fd-rauchmelder logo"></p>
+
 # fd-rauchmelder
 
 Runtime **smoketest** for the funke-pe WordPress plugin repos, as a required
