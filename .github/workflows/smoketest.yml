@@ -82,6 +82,21 @@ jobs:
             npx playwright install --with-deps chromium
           fi
 
+      - name: PHP lint (exact file + line for parse errors)
+        run: |
+          # A parse error would kill the Playground boot with a generic log tail.
+          # php -l catches it first and names the exact file and line.
+          find plugin -name '*.php' -not -path '*/vendor/*' -not -path '*/node_modules/*' -print0 |
+            while IFS= read -r -d '' f; do
+              php -l "$f" > /dev/null 2>>"$GITHUB_WORKSPACE/lint-output.txt" || true
+            done
+          if [ -s "$GITHUB_WORKSPACE/lint-output.txt" ]; then
+            sed -i 's| in plugin/| in |' "$GITHUB_WORKSPACE/lint-output.txt"
+            cat "$GITHUB_WORKSPACE/lint-output.txt"
+            echo "::error::PHP parse error(s) found — see above."
+            exit 1
+          fi
+
       - name: Include optional per-plugin spec
         run: |
           if compgen -G "plugin/.smoketest/*.spec.ts" > /dev/null; then
@@ -136,7 +151,12 @@ jobs:
           {
             echo "### ❌ Plugin Smoketest failed"
             echo
-            if [ -s "$GITHUB_WORKSPACE/playwright-output.txt" ]; then
+            if [ -s "$GITHUB_WORKSPACE/lint-output.txt" ]; then
+              echo "**PHP parse error(s):**"
+              echo '```'
+              cat "$GITHUB_WORKSPACE/lint-output.txt"
+              echo '```'
+            elif [ -s "$GITHUB_WORKSPACE/playwright-output.txt" ]; then
               echo "**Admin smoketest found a problem:**"
               echo '```'
               grep -vE "^\s*$" "$GITHUB_WORKSPACE/playwright-output.txt" | tail -n 25

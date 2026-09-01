@@ -25,6 +25,7 @@ args=( server
   --wp="$WP"
   --login
   --define-bool WP_DEBUG true
+  --define-bool WP_DEBUG_DISPLAY true
   --verbosity=normal )
 if [ -n "$EXTRA_DIRS" ]; then
   steps='[]'

@@ -53,15 +53,20 @@ jobs:
           SMOKE_BASE_URL=http://127.0.0.1:9400 SMOKE_PLUGIN_NAME="Dependency Fixture" npx playwright test
           kill "$(lsof -ti:9400)"
 
-      - name: Broken fixture (runtime fatal) must FAIL
+      - name: Broken fixture (runtime fatal) must FAIL and name file + line
         run: |
           bash boot.sh ./fixtures/broken-plugin /tmp/pg-broken.log
-          if SMOKE_BASE_URL=http://127.0.0.1:9400 npx playwright test; then
+          if SMOKE_BASE_URL=http://127.0.0.1:9400 npx playwright test 2>&1 | tee /tmp/pw-broken.txt; then
             echo "::error::Harness did NOT catch the broken plugin's fatal — it is unreliable."
             kill "$(lsof -ti:9400)"
             exit 1
           fi
-          echo "Broken fixture failed as expected."
+          if ! grep -q "broken-plugin.php" /tmp/pw-broken.txt; then
+            echo "::error::Failure output does not name the offending file — error detail extraction regressed."
+            kill "$(lsof -ti:9400)"
+            exit 1
+          fi
+          echo "Broken fixture failed as expected, naming the offending file."
           kill "$(lsof -ti:9400)"
 
       - name: Broken activation (parse error) must FAIL, fast

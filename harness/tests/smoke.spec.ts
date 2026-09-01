@@ -1,15 +1,17 @@
 import { test, expect, Page } from '@playwright/test';
 
 // Text that means WordPress hit a PHP fatal / uncaught error while rendering.
+// Specific signatures first: with WP_DEBUG_DISPLAY on, the raw PHP error
+// (message + file + line) is in the HTML and beats the generic screen text.
 const FATAL_SIGNATURES = [
-	'There has been a critical error on this website',
-	'There has been a critical error on your website',
-	'Fatal error:',
-	'Parse error:',
 	'Uncaught Error',
 	'Uncaught TypeError',
 	'Uncaught Exception',
 	'Uncaught ArgumentCountError',
+	'Fatal error',
+	'Parse error',
+	'There has been a critical error on this website',
+	'There has been a critical error on your website',
 ];
 
 // Optional: assert this plugin's display name appears active on plugins.php.
@@ -17,7 +19,17 @@ const PLUGIN_NAME = process.env.SMOKE_PLUGIN_NAME || '';
 
 function findFatal(body: string): string | null {
 	for (const sig of FATAL_SIGNATURES) {
-		if (body.includes(sig)) return sig;
+		const idx = body.indexOf(sig);
+		if (idx === -1) continue;
+		// Return the first line of the error, tags stripped — with
+		// WP_DEBUG_DISPLAY on this includes the message, file and line.
+		const detail = body
+			.slice(idx, idx + 600)
+			.replace(/<br\s*\/?>/gi, '\n')
+			.replace(/<[^>]+>/g, '')
+			.split('\n')[0]
+			.trim();
+		return detail || sig;
 	}
 	return null;
 }
