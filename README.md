@@ -1,4 +1,4 @@
-# wp-plugin-smoketest
+# fd-rauchmelder
 
 Runtime **smoketest** for the funke-pe WordPress plugin repos, as a required
 GitHub Action check before a PR merge.
@@ -27,7 +27,7 @@ name: Smoketest
 on: pull_request
 jobs:
   smoketest:
-    uses: funke-pe/wp-plugin-smoketest/.github/workflows/smoketest.yml@main
+    uses: funke-pe/fd-rauchmelder/.github/workflows/smoketest.yml@main
     permissions:
       contents: read
       pull-requests: write  # lets the smoketest post failure details as a PR comment
@@ -61,7 +61,7 @@ needed anywhere:
 ```yaml
 jobs:
   smoketest:
-    uses: funke-pe/wp-plugin-smoketest/.github/workflows/smoketest.yml@main
+    uses: funke-pe/fd-rauchmelder/.github/workflows/smoketest.yml@main
     permissions:
       contents: read
       pull-requests: write

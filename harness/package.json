@@ -1,5 +1,5 @@
 {
-  "name": "wp-plugin-smoketest-harness",
+  "name": "fd-rauchmelder-harness",
   "version": "1.0.0",
   "private": true,
   "description": "Runtime smoketest harness: boots WordPress via Playground and drives wp-admin with Playwright.",
