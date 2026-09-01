@@ -15,9 +15,9 @@
   </g>
   <!-- stylized FD -->
   <g fill="none" stroke="#ff0000" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M75 226 V166 H107"/>
-    <path d="M75 196 H101"/>
-    <path d="M125 166 V226 H135 A30 30 0 0 0 135 166 Z"/>
+    <path d="M79 226 V166 H111"/>
+    <path d="M79 196 H105"/>
+    <path d="M129 166 V226 H139 A30 30 0 0 0 139 166 Z"/>
   </g>
   <!-- status LED -->
   <circle cx="120" cy="128" r="6" fill="#ffd400"/>
