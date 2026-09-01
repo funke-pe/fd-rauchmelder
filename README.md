@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/logo.svg" width="120" alt="fd-rauchmelder logo"></p>
+<div align="center"><img src="assets/logo.svg" width="120" alt="fd-rauchmelder logo"></div>
 
 # fd-rauchmelder
 
