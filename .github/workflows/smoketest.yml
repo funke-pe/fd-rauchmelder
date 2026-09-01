@@ -151,11 +151,20 @@ jobs:
             echo "_Full report: see the smoketest-report artifact on the [failed run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})._"
           } > "$GITHUB_WORKSPACE/smoketest-comment.md"
           cat "$GITHUB_WORKSPACE/smoketest-comment.md" >> "$GITHUB_STEP_SUMMARY"
-          gh pr comment "${{ github.event.pull_request.number }}" \
-            --repo "${{ github.repository }}" \
-            --body-file "$GITHUB_WORKSPACE/smoketest-comment.md" \
-            --edit-last --create-if-none \
-            || echo "::warning::Could not post PR comment (needs 'pull-requests: write' permission in the caller workflow)."
+          {
+            # Delete our previous bot comment and post a fresh one so the
+            # failure always shows up at the END of the PR timeline
+            # (an edited comment stays buried at its original position).
+            pr=${{ github.event.pull_request.number }}
+            gh api "repos/${{ github.repository }}/issues/$pr/comments" \
+              --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("### ❌ Plugin Smoketest failed"))) | .id' \
+            | while read -r id; do
+                gh api -X DELETE "repos/${{ github.repository }}/issues/comments/$id"
+              done
+            gh pr comment "$pr" \
+              --repo "${{ github.repository }}" \
+              --body-file "$GITHUB_WORKSPACE/smoketest-comment.md"
+          } || echo "::warning::Could not post PR comment (needs 'pull-requests: write' permission in the caller workflow)."
 
       - name: Upload report on failure
         if: failure()
