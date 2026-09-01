@@ -164,7 +164,8 @@ jobs:
             else
               echo "**WordPress could not boot with this plugin — likely a PHP parse error or activation fatal:**"
               echo '```'
-              grep -vE "^\s*$" "$GITHUB_WORKSPACE/playground.log" | tail -n 15
+              # The log contains PHP's HTML-formatted error output — strip the tags.
+              sed 's|<[^>]*>||g' "$GITHUB_WORKSPACE/playground.log" | grep -vE "^\s*$" | tail -n 15
               echo '```'
             fi
             echo

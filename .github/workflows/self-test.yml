@@ -55,6 +55,7 @@ jobs:
 
       - name: Broken fixture (runtime fatal) must FAIL and name file + line
         run: |
+          set -o pipefail  # otherwise tee masks the playwright exit code
           bash boot.sh ./fixtures/broken-plugin /tmp/pg-broken.log
           if SMOKE_BASE_URL=http://127.0.0.1:9400 npx playwright test 2>&1 | tee /tmp/pw-broken.txt; then
             echo "::error::Harness did NOT catch the broken plugin's fatal — it is unreliable."
